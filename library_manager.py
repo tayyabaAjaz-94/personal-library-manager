@@ -2,30 +2,26 @@ import streamlit as st
 import mysql.connector
 import os
 
-# Streamlit Config
+#  Streamlit Config
 st.set_page_config(page_title="Personal Library Manager", page_icon="📚", layout="wide")
 
-# Database Configuration
+#  Database Configuration
 DB_CONFIG = {
-    "host": "localhost",  # Ensure MySQL is running here
-    "user": "root",       # Ensure the user has proper access to the database
-    "password": "",       # If no password, leave empty, else provide the password
-    "database": "library_db"  # Ensure the database exists
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "library_db"
 }
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 📂 Database Class with Error Handling
+# 📂 Database Class
 class Database:
     def __init__(self):
-        try:
-            self.conn = mysql.connector.connect(**DB_CONFIG)
-            self.cursor = self.conn.cursor(dictionary=True)
-            self.create_table()
-        except mysql.connector.Error as err:
-            st.error(f"Database connection failed: {err}")
-            raise
+        self.conn = mysql.connector.connect(**DB_CONFIG)
+        self.cursor = self.conn.cursor(dictionary=True)
+        self.create_table()
 
     def create_table(self):
         query = """
@@ -53,10 +49,9 @@ class Database:
         self.cursor.close()
         self.conn.close()
 
-# Initialize Database Connection
 db = Database()
 
-# Sidebar Menu
+#  Sidebar Menu
 st.sidebar.title("📌 Menu")
 menu = st.sidebar.radio("", ["➕ Add Book", "🖊 Update Book", "🗑 Remove Book", "🔍 Search Books", "📖 View All Books", "📊 Statistics"])
 
@@ -137,7 +132,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# **Add Book**
+
+#  **Add Book**
 if menu == "➕ Add Book":
     st.markdown('<p class="title">Add a New Book</p>', unsafe_allow_html=True)
     with st.form("add_book_form", clear_on_submit=True):
@@ -175,7 +171,7 @@ if menu == "➕ Add Book":
             st.success(f"✅ Book '{title}' added successfully!")
 
 
-# **Update Book**
+#  **Update Book**
 elif menu == "🖊 Update Book":
     st.markdown('<p class="title">Update an Existing Book</p>', unsafe_allow_html=True)
 
@@ -229,7 +225,8 @@ elif menu == "🖊 Update Book":
         st.info("⚠ Please add at least one book to update.")
 
 
-# **Remove Book**
+
+#  **Remove Book**
 elif menu == "🗑 Remove Book":
     st.markdown('<p class="title">Remove a Book</p>', unsafe_allow_html=True)
     books = db.execute_query("SELECT * FROM books", fetch=True)
@@ -246,48 +243,166 @@ elif menu == "🗑 Remove Book":
         st.info("⚠ No books available to remove.")
 
 
-# **Search Books**
+#  **Search Books**
 elif menu == "🔍 Search Books":
-    st.markdown('<p class="title">Search Books</p>', unsafe_allow_html=True)
+    st.markdown('<p class="title">Search for Books</p>', unsafe_allow_html=True)
+    search_term = st.text_input("🔎 Enter book title or author:")
 
-    search_term = st.text_input("🔎 Enter search term (Title, Author, Genre)", "")
-    if search_term:
-        results = db.execute_query(
-            "SELECT * FROM books WHERE title LIKE %s OR author LIKE %s OR genre LIKE %s",
-            (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"),
-            fetch=True
-        )
-        if results:
-            st.write(f"Found {len(results)} results:")
-            for book in results:
-                st.write(f"📖 {book['title']} by {book['author']}, {book['publication_year']} ({book['genre']})")
+    # Add search button
+    if st.button("🔍 Search"):
+        if search_term:
+            results = db.execute_query("SELECT * FROM books WHERE title LIKE %s OR author LIKE %s", 
+                                       (f"%{search_term}%", f"%{search_term}%"), fetch=True)
+            if results:
+                for book in results:
+                    read_status_label = "✔ Read" if book["read_status"] == 1 else "❌ Unread"
+                    st.write(f"📖 {book['title']} by {book['author']} ({book['publication_year']}) - {read_status_label} - {book['category']}")
+            else:
+                st.info("🔍 No matching books found.")
         else:
-            st.info("⚠ No books found.")
-    else:
-        st.info("⚠ Please enter a search term.")
-
+            st.warning("⚠ Please enter a title or author to search.")
 
 # **View All Books**
 elif menu == "📖 View All Books":
-    st.markdown('<p class="title">All Books</p>', unsafe_allow_html=True)
-
+    st.markdown('<p class="title">View All Books in Your Library</p>', unsafe_allow_html=True)
     books = db.execute_query("SELECT * FROM books", fetch=True)
 
     if books:
         for book in books:
-            st.write(f"📖 {book['title']} by {book['author']}, {book['publication_year']} ({book['genre']})")
+            # Create a container for each book (vertical layout)
+            with st.container():
+                # Layout for book information in vertical way
+                col1, col2 = st.columns([1, 3])  # Two columns: one for image, one for details
+
+                with col1:
+                    # Show the book cover image in a small size
+                    if book["pic"]:
+                        st.image(book["pic"], caption="Book Cover", width=100)  # Small image (adjust size)
+                    else:
+                        st.image("https://via.placeholder.com/100x150?text=No+Cover", caption="No Cover", width=100)
+
+                with col2:
+                    # Display book information in a clean, professional vertical layout
+                    st.markdown(f"### 📖 {book['title']}")
+                    st.markdown(f"**Author:** ✍️ {book['author']}")
+                    st.markdown(f"**Year:** 📅 {book['publication_year']}")
+                    st.markdown(f"**Genre:** 📂 {book['genre']}")
+                    st.markdown(f"**Category:** 📌 {book['category']}")
+                    read_status_label = "✔ Read" if int(book["read_status"]) == 1 else "❌ Unread"
+                    st.markdown(f"**Status:** {read_status_label}")
+                    st.markdown(f"**Rating:** ⭐ {book['rating']} / 5")
+
+                st.markdown("---")  # Divider between books
     else:
-        st.info("⚠ No books available.")
+        st.info("📂 Your library is empty.")
 
 
-# **Statistics**
+# 📊 **Statistics**
+# 📊 **Statistics**
 elif menu == "📊 Statistics":
     st.markdown('<p class="title">Library Statistics</p>', unsafe_allow_html=True)
 
-    total_books = db.execute_query("SELECT COUNT(*) FROM books", fetch=True)[0]["COUNT(*)"]
-    read_books = db.execute_query("SELECT COUNT(*) FROM books WHERE read_status=1", fetch=True)[0]["COUNT(*)"]
-    avg_rating = db.execute_query("SELECT AVG(rating) FROM books", fetch=True)[0]["AVG(rating)"]
+    # Query statistics from the database
+    read_books = db.execute_query("SELECT COUNT(*) AS count FROM books WHERE read_status = 1", fetch=True)[0]['count']
+    unread_books = db.execute_query("SELECT COUNT(*) AS count FROM books WHERE read_status = 0", fetch=True)[0]['count']
+    total_books = read_books + unread_books
+    category_stats = db.execute_query(""" 
+        SELECT category, COUNT(*) AS count FROM books GROUP BY category 
+    """, fetch=True)
 
-    st.write(f"📚 Total Books: {total_books}")
-    st.write(f"✅ Books Read: {read_books}")
-    st.write(f"⭐ Average Rating: {avg_rating:.2f}")
+    # Display the stats in a grid layout
+    st.markdown('<div class="stat-container">', unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+            .stat-container {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 20px;
+                margin-top: 20px;
+                padding: 20px;
+                border-radius: 8px;
+            }
+            .stat-card {
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                text-align: center;
+                background-color: transparent;  /* No background color */
+            }
+            .stat-card h5 { /* Changed h4 to h5 */
+                font-size: 1.4em;
+                margin-bottom: 10px;
+                color: #4A90E2; /* Lighter blue color for all h5 headings */
+            }
+            .stat-card p {
+                font-size: 1.2em;
+                color: white; /* White color for all p text */
+            }
+            .category-header {
+                font-size: 1.8em;
+                color: #4A90E2; /* Lighter blue color for the category distribution heading */
+                font-weight: bold;
+                margin-top: 30px;
+                margin-bottom: 15px;
+                text-align: center;
+            }
+            .title {
+                font-size: 2em;
+                color: #4A90E2; /* Lighter blue color for Library Statistics heading */
+                font-weight: bold;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+            .section-header {
+                font-size: 1.8em;
+                color: #4A90E2; /* Lighter blue color for section headers */
+                font-weight: bold;
+                margin-top: 20px;
+                margin-bottom: 10px;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Display the total, read, and unread books in "cards"
+    st.markdown(f"""
+        <div class="stat-card">
+            <h5>📚 Total Books</h5>  <!-- Changed h4 to h5 -->
+            <p>{total_books}</p>
+        </div>
+        <div class="stat-card">
+            <h5>📖 Read Books</h5>  <!-- Changed h4 to h5 -->
+            <p>{read_books}</p>
+        </div>
+        <div class="stat-card">
+            <h5>📕 Unread Books</h5>  <!-- Changed h4 to h5 -->
+            <p>{unread_books}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Highlight the "Category-wise Distribution" heading in light blue
+    st.markdown('<p class="category-header">📊 Category-wise Distribution</p>', unsafe_allow_html=True)
+    
+    if category_stats:
+        # Display categories in cards within two columns
+        col1, col2 = st.columns(2)
+        with col1:
+            for category in category_stats[:len(category_stats)//2]:
+                st.markdown(f"""
+                    <div class="stat-card">
+                        <h5>{category['category']}</h5>  <!-- Changed h4 to h5 -->
+                        <p>{category['count']} books</p>
+                    </div>
+                """, unsafe_allow_html=True)
+        with col2:
+            for category in category_stats[len(category_stats)//2:]:
+                st.markdown(f"""
+                    <div class="stat-card">
+                        <h5>{category['category']}</h5>  <!-- Changed h4 to h5 -->
+                        <p>{category['count']} books</p>
+                    </div>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("⚠ No category statistics available.")
+
+
+db.close()
