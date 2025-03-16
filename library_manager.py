@@ -6,12 +6,21 @@ import os
 st.set_page_config(page_title="Personal Library Manager", page_icon="📚", layout="wide")
 
 #  Database Configuration
-DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "",
-    "database": "library_db"
-}
+# DB_CONFIG = {
+#     "host": "localhost",
+#     "user": "root",
+#     "password": "",
+#     "database": "library_db"
+# }
+
+db = mysql.connector.connect(
+        user='root', 
+        password='', 
+        host='localhost', 
+        database='library_db'
+    )
+ 
+
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
