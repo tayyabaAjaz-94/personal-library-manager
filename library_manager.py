@@ -7,21 +7,25 @@ st.set_page_config(page_title="Personal Library Manager", page_icon="📚", layo
 
 # Database Configuration
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": "",
-    "database": "library_db"
+    "host": "localhost",  # Ensure MySQL is running here
+    "user": "root",       # Ensure the user has proper access to the database
+    "password": "",       # If no password, leave empty, else provide the password
+    "database": "library_db"  # Ensure the database exists
 }
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 📂 Database Class
+# 📂 Database Class with Error Handling
 class Database:
     def __init__(self):
-        self.conn = mysql.connector.connect(**DB_CONFIG)
-        self.cursor = self.conn.cursor(dictionary=True)
-        self.create_table()
+        try:
+            self.conn = mysql.connector.connect(**DB_CONFIG)
+            self.cursor = self.conn.cursor(dictionary=True)
+            self.create_table()
+        except mysql.connector.Error as err:
+            st.error(f"Database connection failed: {err}")
+            raise
 
     def create_table(self):
         query = """
@@ -49,6 +53,7 @@ class Database:
         self.cursor.close()
         self.conn.close()
 
+# Initialize Database Connection
 db = Database()
 
 # Sidebar Menu
@@ -131,7 +136,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
 
 # **Add Book**
 if menu == "➕ Add Book":
@@ -244,72 +248,46 @@ elif menu == "🗑 Remove Book":
 
 # **Search Books**
 elif menu == "🔍 Search Books":
-    st.markdown('<p class="title">Search for Books</p>', unsafe_allow_html=True)
-    search_term = st.text_input("🔎 Enter book title or author:")
+    st.markdown('<p class="title">Search Books</p>', unsafe_allow_html=True)
 
-    # Add search button
-    if st.button("🔍 Search"):
-        if search_term:
-            results = db.execute_query("SELECT * FROM books WHERE title LIKE %s OR author LIKE %s", 
-                                       (f"%{search_term}%", f"%{search_term}%"), fetch=True)
-            if results:
-                for book in results:
-                    read_status_label = "✔ Read" if book["read_status"] == 1 else "❌ Unread"
-                    st.write(f"📖 {book['title']} by {book['author']} ({book['publication_year']}) - {read_status_label} - {book['category']}")
-            else:
-                st.info("🔍 No matching books found.")
+    search_term = st.text_input("🔎 Enter search term (Title, Author, Genre)", "")
+    if search_term:
+        results = db.execute_query(
+            "SELECT * FROM books WHERE title LIKE %s OR author LIKE %s OR genre LIKE %s",
+            (f"%{search_term}%", f"%{search_term}%", f"%{search_term}%"),
+            fetch=True
+        )
+        if results:
+            st.write(f"Found {len(results)} results:")
+            for book in results:
+                st.write(f"📖 {book['title']} by {book['author']}, {book['publication_year']} ({book['genre']})")
         else:
-            st.warning("⚠ Please enter a title or author to search.")
+            st.info("⚠ No books found.")
+    else:
+        st.info("⚠ Please enter a search term.")
 
 
 # **View All Books**
 elif menu == "📖 View All Books":
-    st.markdown('<p class="title">View All Books in Your Library</p>', unsafe_allow_html=True)
+    st.markdown('<p class="title">All Books</p>', unsafe_allow_html=True)
+
     books = db.execute_query("SELECT * FROM books", fetch=True)
 
     if books:
         for book in books:
-            # Create a container for each book (vertical layout)
-            with st.container():
-                # Layout for book information in vertical way
-                col1, col2 = st.columns([1, 3])  # Two columns: one for image, one for details
-
-                with col1:
-                    # Show the book cover image in a small size
-                    if book["pic"]:
-                        st.image(book["pic"], caption="Book Cover", width=100)  # Small image (adjust size)
-                    else:
-                        st.image("https://via.placeholder.com/100x150?text=No+Cover", caption="No Cover", width=100)
-
-                with col2:
-                    # Display book information in a clean, professional vertical layout
-                    st.markdown(f"### 📖 {book['title']}")
-                    st.markdown(f"**Author:** ✍️ {book['author']}")
-                    st.markdown(f"**Year:** 📅 {book['publication_year']}")
-                    st.markdown(f"**Genre:** 📂 {book['genre']}")
-                    st.markdown(f"**Category:** 📌 {book['category']}")
-                    read_status_label = "✔ Read" if int(book["read_status"]) == 1 else "❌ Unread"
-                    st.markdown(f"**Status:** {read_status_label}")
-                    st.markdown(f"**Rating:** ⭐ {book['rating']} / 5")
-
-                st.markdown("---")  # Divider between books
+            st.write(f"📖 {book['title']} by {book['author']}, {book['publication_year']} ({book['genre']})")
     else:
-        st.info("📂 Your library is empty.")
+        st.info("⚠ No books available.")
 
 
 # **Statistics**
 elif menu == "📊 Statistics":
     st.markdown('<p class="title">Library Statistics</p>', unsafe_allow_html=True)
 
-    # Query statistics from the database
-    read_books = db.execute_query("SELECT COUNT(*) AS count FROM books WHERE read_status = 1", fetch=True)[0]['count']
-    unread_books = db.execute_query("SELECT COUNT(*) AS count FROM books WHERE read_status = 0", fetch=True)[0]['count']
-    total_books = read_books + unread_books
+    total_books = db.execute_query("SELECT COUNT(*) FROM books", fetch=True)[0]["COUNT(*)"]
+    read_books = db.execute_query("SELECT COUNT(*) FROM books WHERE read_status=1", fetch=True)[0]["COUNT(*)"]
+    avg_rating = db.execute_query("SELECT AVG(rating) FROM books", fetch=True)[0]["AVG(rating)"]
 
-    st.markdown(f"**Total Books in Library:** 📚 {total_books}")
-    st.markdown(f"**Books Read:** ✔ {read_books}")
-    st.markdown(f"**Books Unread:** ❌ {unread_books}")
-    st.markdown(f"**Average Rating:** ⭐ {round(db.execute_query('SELECT AVG(rating) AS avg_rating FROM books', fetch=True)[0]['avg_rating'], 2)} / 5")
-
-# Close database connection when done
-db.close()
+    st.write(f"📚 Total Books: {total_books}")
+    st.write(f"✅ Books Read: {read_books}")
+    st.write(f"⭐ Average Rating: {avg_rating:.2f}")
