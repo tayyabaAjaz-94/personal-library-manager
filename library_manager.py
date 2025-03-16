@@ -2,25 +2,16 @@ import streamlit as st
 import mysql.connector
 import os
 
-#  Streamlit Config
+# Streamlit Config
 st.set_page_config(page_title="Personal Library Manager", page_icon="📚", layout="wide")
 
-#  Database Configuration
-# DB_CONFIG = {
-#     "host": "localhost",
-#     "user": "root",
-#     "password": "",
-#     "database": "library_db"
-# }
-
-db = mysql.connector.connect(
-        user='root', 
-        password='', 
-        host='localhost', 
-        database='library_db'
-    )
- 
-
+# Database Configuration
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "library_db"
+}
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -60,7 +51,7 @@ class Database:
 
 db = Database()
 
-#  Sidebar Menu
+# Sidebar Menu
 st.sidebar.title("📌 Menu")
 menu = st.sidebar.radio("", ["➕ Add Book", "🖊 Update Book", "🗑 Remove Book", "🔍 Search Books", "📖 View All Books", "📊 Statistics"])
 
@@ -142,7 +133,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-#  **Add Book**
+# **Add Book**
 if menu == "➕ Add Book":
     st.markdown('<p class="title">Add a New Book</p>', unsafe_allow_html=True)
     with st.form("add_book_form", clear_on_submit=True):
@@ -180,7 +171,7 @@ if menu == "➕ Add Book":
             st.success(f"✅ Book '{title}' added successfully!")
 
 
-#  **Update Book**
+# **Update Book**
 elif menu == "🖊 Update Book":
     st.markdown('<p class="title">Update an Existing Book</p>', unsafe_allow_html=True)
 
@@ -234,8 +225,7 @@ elif menu == "🖊 Update Book":
         st.info("⚠ Please add at least one book to update.")
 
 
-
-#  **Remove Book**
+# **Remove Book**
 elif menu == "🗑 Remove Book":
     st.markdown('<p class="title">Remove a Book</p>', unsafe_allow_html=True)
     books = db.execute_query("SELECT * FROM books", fetch=True)
@@ -252,7 +242,7 @@ elif menu == "🗑 Remove Book":
         st.info("⚠ No books available to remove.")
 
 
-#  **Search Books**
+# **Search Books**
 elif menu == "🔍 Search Books":
     st.markdown('<p class="title">Search for Books</p>', unsafe_allow_html=True)
     search_term = st.text_input("🔎 Enter book title or author:")
@@ -270,6 +260,7 @@ elif menu == "🔍 Search Books":
                 st.info("🔍 No matching books found.")
         else:
             st.warning("⚠ Please enter a title or author to search.")
+
 
 # **View All Books**
 elif menu == "📖 View All Books":
@@ -306,8 +297,7 @@ elif menu == "📖 View All Books":
         st.info("📂 Your library is empty.")
 
 
-# 📊 **Statistics**
-# 📊 **Statistics**
+# **Statistics**
 elif menu == "📊 Statistics":
     st.markdown('<p class="title">Library Statistics</p>', unsafe_allow_html=True)
 
@@ -315,103 +305,11 @@ elif menu == "📊 Statistics":
     read_books = db.execute_query("SELECT COUNT(*) AS count FROM books WHERE read_status = 1", fetch=True)[0]['count']
     unread_books = db.execute_query("SELECT COUNT(*) AS count FROM books WHERE read_status = 0", fetch=True)[0]['count']
     total_books = read_books + unread_books
-    category_stats = db.execute_query(""" 
-        SELECT category, COUNT(*) AS count FROM books GROUP BY category 
-    """, fetch=True)
 
-    # Display the stats in a grid layout
-    st.markdown('<div class="stat-container">', unsafe_allow_html=True)
-    st.markdown("""
-        <style>
-            .stat-container {
-                display: grid;
-                grid-template-columns: repeat(3, 1fr);
-                gap: 20px;
-                margin-top: 20px;
-                padding: 20px;
-                border-radius: 8px;
-            }
-            .stat-card {
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                text-align: center;
-                background-color: transparent;  /* No background color */
-            }
-            .stat-card h5 { /* Changed h4 to h5 */
-                font-size: 1.4em;
-                margin-bottom: 10px;
-                color: #4A90E2; /* Lighter blue color for all h5 headings */
-            }
-            .stat-card p {
-                font-size: 1.2em;
-                color: white; /* White color for all p text */
-            }
-            .category-header {
-                font-size: 1.8em;
-                color: #4A90E2; /* Lighter blue color for the category distribution heading */
-                font-weight: bold;
-                margin-top: 30px;
-                margin-bottom: 15px;
-                text-align: center;
-            }
-            .title {
-                font-size: 2em;
-                color: #4A90E2; /* Lighter blue color for Library Statistics heading */
-                font-weight: bold;
-                text-align: center;
-                margin-bottom: 20px;
-            }
-            .section-header {
-                font-size: 1.8em;
-                color: #4A90E2; /* Lighter blue color for section headers */
-                font-weight: bold;
-                margin-top: 20px;
-                margin-bottom: 10px;
-            }
-        </style>
-    """, unsafe_allow_html=True)
+    st.markdown(f"**Total Books in Library:** 📚 {total_books}")
+    st.markdown(f"**Books Read:** ✔ {read_books}")
+    st.markdown(f"**Books Unread:** ❌ {unread_books}")
+    st.markdown(f"**Average Rating:** ⭐ {round(db.execute_query('SELECT AVG(rating) AS avg_rating FROM books', fetch=True)[0]['avg_rating'], 2)} / 5")
 
-    # Display the total, read, and unread books in "cards"
-    st.markdown(f"""
-        <div class="stat-card">
-            <h5>📚 Total Books</h5>  <!-- Changed h4 to h5 -->
-            <p>{total_books}</p>
-        </div>
-        <div class="stat-card">
-            <h5>📖 Read Books</h5>  <!-- Changed h4 to h5 -->
-            <p>{read_books}</p>
-        </div>
-        <div class="stat-card">
-            <h5>📕 Unread Books</h5>  <!-- Changed h4 to h5 -->
-            <p>{unread_books}</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Highlight the "Category-wise Distribution" heading in light blue
-    st.markdown('<p class="category-header">📊 Category-wise Distribution</p>', unsafe_allow_html=True)
-    
-    if category_stats:
-        # Display categories in cards within two columns
-        col1, col2 = st.columns(2)
-        with col1:
-            for category in category_stats[:len(category_stats)//2]:
-                st.markdown(f"""
-                    <div class="stat-card">
-                        <h5>{category['category']}</h5>  <!-- Changed h4 to h5 -->
-                        <p>{category['count']} books</p>
-                    </div>
-                """, unsafe_allow_html=True)
-        with col2:
-            for category in category_stats[len(category_stats)//2:]:
-                st.markdown(f"""
-                    <div class="stat-card">
-                        <h5>{category['category']}</h5>  <!-- Changed h4 to h5 -->
-                        <p>{category['count']} books</p>
-                    </div>
-                """, unsafe_allow_html=True)
-    else:
-        st.info("⚠ No category statistics available.")
-
-
+# Close database connection when done
 db.close()
